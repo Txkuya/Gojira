@@ -23,13 +23,9 @@
   --keyBorder:#4a4b50;
   --keyText:#ffffff;
   
-  /* Dynamic sizing logic: 
-     - Minimum 26px (very small phones)
-     - Target 8.5% of viewport width (mobile)
-     - Maximum 46px (desktop) 
-  */
-  --tileSize: clamp(26px, 8.5vw, 46px);
-  --gapSize: clamp(4px, 1.5vw, 10px);
+  /* Slightly smaller tiles so level 3 fits on tall phones */
+  --tileSize: clamp(24px, 7.4vw, 42px);
+  --gapSize: clamp(3px, 1.3vw, 8px);
 }
 
 body{
@@ -37,18 +33,18 @@ body{
   font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
   background:var(--bg);
   color:var(--text);
-  min-height:100vh; /* changed to min-height for safety */
+  min-height:100vh;
   height: 100%;
-  display:flex;     /* better for mobile vertical centering */
+  display:flex;
   flex-direction: column;
   align-items: center;
   overflow-x:hidden;
-  touch-action: manipulation; /* Improves touch response */
+  touch-action: manipulation;
 }
 
 .wrap{ 
   width: min(100%, 600px); 
-  padding: 10px 0 20px; 
+  padding: 8px 0 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -56,29 +52,29 @@ body{
   flex: 1;
 }
 
-h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; }
-.level{ text-align:center; margin:0 0 10px; color:var(--muted); font-size:13px; }
+h1{ margin:8px 0 4px; font-size:18px; letter-spacing:.08em; text-align:center; }
+.level{ text-align:center; margin:0 0 8px; color:var(--muted); font-size:13px; }
 
 /* Progress phrase (BLANKS until solved) */
 #progress{
   display:flex;
   justify-content:center;
-  gap:8px;
+  gap:6px;
   flex-wrap:wrap;
-  margin: 5px 0 15px;
-  padding: 0 10px;
+  margin: 4px 0 10px;
+  padding: 0 8px;
 }
 .chip{
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid #2a2a2c;
   background: rgba(255,255,255,0.04);
   color: var(--muted);
   font-weight: 750;
   letter-spacing: .02em;
-  font-size: 12px;
+  font-size: 11px;
   user-select:none;
-  min-width: 80px;
+  min-width: 72px;
   text-align:center;
   white-space: nowrap;
 }
@@ -96,14 +92,14 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
 /* Board */
 #board{
   display:grid;
-  gap: 6px; /* Row gap */
+  gap: 4px;
   justify-content:center;
-  margin: 0 0 10px;
+  margin: 0 0 6px;
   width: 100%;
 }
 .row{
   display:flex;
-  gap: var(--gapSize); /* Column gap */
+  gap: var(--gapSize);
   justify-content:center;
   align-items:center;
   flex-wrap:nowrap;
@@ -112,7 +108,7 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
 /* Flip tiles - Responsive Sizing */
 .tile{
   width: var(--tileSize);
-  height: calc(var(--tileSize) * 1.15); /* Keep aspect ratio */
+  height: calc(var(--tileSize) * 1.1);
   perspective: 800px;
   user-select:none;
 }
@@ -127,8 +123,7 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
   display:grid;
   place-items:center;
   font-weight:800;
-  /* Dynamic font size based on tile size */
-  font-size: calc(var(--tileSize) * 0.55); 
+  font-size: calc(var(--tileSize) * 0.5);
   text-transform:uppercase;
   box-sizing:border-box;
   backface-visibility:hidden;
@@ -155,8 +150,8 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
 
 /* Visible word gaps */
 .gap{
-  width: calc(var(--tileSize) * 0.3);
-  height: calc(var(--tileSize) * 1.15);
+  width: calc(var(--tileSize) * 0.28);
+  height: calc(var(--tileSize) * 1.1);
   display:block;
   opacity:.35;
   position:relative;
@@ -170,19 +165,19 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
   border-radius:2px;
 }
 
-/* Keyboard - Responsive */
+/* Keyboard - closer to board */
 #keyboard{ 
-  margin-top: auto; /* Push to bottom on tall screens */
-  margin-bottom: 10px;
+  margin-top: 6px;
+  margin-bottom: 4px;
   display:grid; 
-  gap:8px; 
+  gap:6px; 
   width: 100%;
-  padding: 0 8px; /* Safe area from edges */
+  padding: 0 6px;
   box-sizing: border-box;
 }
 .krow{ 
   display:flex; 
-  gap: 6px; 
+  gap: 4px; 
   justify-content:center; 
   width: 100%;
 }
@@ -194,24 +189,23 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
   font-weight: 700;
   border-radius: 4px;
   
-  /* Flexbox magic for responsive keys */
   flex: 1;
-  min-width: 0; /* Allows shrinking */
-  height: 58px; /* Taller for easier tapping */
+  min-width: 0;
+  height: 50px;
   padding: 0;
   display: grid;
   place-items: center;
   
-  font-size: 13px;
+  font-size: 12px;
   cursor:pointer;
   user-select:none;
-  touch-action:manipulation; /* Prevents zoom delay */
+  touch-action:manipulation;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.10),
     0 1px 2px rgba(0,0,0,0.25);
   transition: transform 80ms ease, filter 120ms ease, background 120ms ease;
 }
-.key.wide{ flex: 1.5; font-size: 12px; } /* Enter/Back are slightly wider */
+.key.wide{ flex: 1.4; font-size: 11px; }
 .key:active{ transform: translateY(1px) scale(0.96); filter: brightness(1.08); }
 
 .key.absent{ background: var(--absent); border-color: var(--absent); color:#fff; }
@@ -220,10 +214,10 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
 
 .msg{ 
   text-align:center; 
-  min-height:22px; 
-  margin: 10px 0; 
+  min-height:18px; 
+  margin: 4px 0 2px; 
   color:var(--muted); 
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -275,7 +269,7 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
   position:relative;
   margin-top: 10px;
   flex-wrap:wrap;
-  min-height: 60px; /* Space for runaway button */
+  min-height: 60px;
 }
 
 .btn{
@@ -300,7 +294,7 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
   border:1px solid #444;
   position: static;
   transform:none;
-  transition: transform 200ms ease-out; /* Faster for mobile feeling */
+  transition: transform 200ms ease-out;
   will-change: transform;
   z-index: 100;
 }
@@ -308,7 +302,6 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
   position: fixed;
   left: 50%;
   top: 50%;
-  /* Removed the initial transform centering here to be handled by JS for smoother jumps */
 }
 
 .counters{
@@ -345,7 +338,7 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
 
 /* Specific Small Screen Tweaks */
 @media (max-width: 360px) {
-  .key { font-size: 11px; height: 50px; }
+  .key { font-size: 10px; height: 46px; }
   .modal h2 { font-size: 20px; }
   .modal p { font-size: 16px; }
 }
@@ -392,9 +385,9 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
 <script>
 (() => {
   const LEVELS = [
-    { answer: "Will you", tries: 6 },
+    { answer: "Will you", tries: 5 },
     { answer: "be my", tries: 5 },
-    { answer: "girlfriend?", tries: 7 }
+    { answer: "girlfriend?", tries: 5 }
   ];
 
   const KEY_ROWS = [
@@ -433,7 +426,7 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
   const solvedText = Array(LEVELS.length).fill("");
 
   let ANSWER = "";
-  let MAX_TRIES = 6;
+  let MAX_TRIES = 5;
   let answerChars = [];
   let L = 0;
   let guesses = [];
@@ -475,7 +468,6 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
 
   function blanksForLevel(i){
     const n = LEVELS[i].answer.length;
-    // slightly reduced obfuscation for small screens logic
     const shown = Math.min(10, Math.max(4, Math.round(n * 0.75)));
     return "▯".repeat(shown);
   }
@@ -656,7 +648,7 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
         }
 
         btn.addEventListener("click", (e) => {
-          e.preventDefault(); // prevent double firing
+          e.preventDefault();
           if (btn.dataset.key === "ENTER") handleEnter();
           else if (btn.dataset.key === "BACK") handleBackspace();
           else handleType(btn.dataset.key);
@@ -890,11 +882,9 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
     if (runawayActivated) return;
     runawayActivated = true;
     noBtn.classList.add("runaway");
-    // Initial jump to fixed positioning center
     noBtn.style.transform = 'translate(-50%, -50%)'; 
   }
 
-  // Combine events for better mobile handling
   ['mouseenter', 'touchstart'].forEach(evt => 
     noBtn.addEventListener(evt, (e) => {
       if (evt === 'touchstart') e.preventDefault();
@@ -921,18 +911,15 @@ h1{ margin:10px 0 5px; font-size:20px; letter-spacing:.08em; text-align:center; 
     const bw = noBtn.offsetWidth;
     const bh = noBtn.offsetHeight;
 
-    // Constrain to viewport dimensions safely
     const maxX = window.innerWidth - bw - padding;
     const maxY = window.innerHeight - bh - padding;
 
     const targetX = padding + Math.random() * Math.max(0, maxX);
     const targetY = padding + Math.random() * Math.max(0, maxY);
 
-    // Calculate position relative to top-left of screen since it is fixed
     const centerOffsetX = (window.innerWidth / 2);
     const centerOffsetY = (window.innerHeight / 2);
     
-    // We want to translate from center to the target coordinate
     const moveX = targetX - centerOffsetX + (bw/2);
     const moveY = targetY - centerOffsetY + (bh/2);
 
