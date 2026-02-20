@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
   <title>Wordle - Gojira Edition</title>
   <style>
     :root{
@@ -24,40 +24,69 @@
       --keyText:#ffffff;
     }
 
+    * { box-sizing: border-box; }
+
     body{
       margin:0;
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
       background:var(--bg);
       color:var(--text);
-      min-height:100vh;
-      display:grid;
-      place-items:center;
-      overflow-x:hidden;
+      /* Use dvh for mobile URL bar adjustment, fallback to vh */
+      height: 100vh;
+      height: 100dvh; 
+      display:flex;
+      flex-direction: column;
+      align-items: center;
+      overflow: hidden; /* Prevent scrolling */
+      touch-action: manipulation; /* Stop double-tap zoom */
     }
 
-    .wrap{ width:min(980px,94vw); padding:18px 0 26px; }
-    h1{ margin:6px 0 10px; font-size:18px; letter-spacing:.08em; text-align:center; }
-    .level{ text-align:center; margin:0 0 6px; color:var(--muted); font-size:13px; }
+    /* The hidden input that triggers native keyboard */
+    #virtual-input {
+      position: absolute;
+      opacity: 0;
+      top: -1000px;
+      left: -1000px;
+      height: 0;
+      width: 0;
+      pointer-events: none; 
+      /* Important for preventing zoom on iOS focus */
+      font-size: 16px; 
+    }
 
-    /* Progress phrase (BLANKS until solved) */
+    .wrap{ 
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      padding: 10px;
+      position: relative;
+    }
+
+    h1{ margin: 4px 0; font-size:18px; letter-spacing:.08em; text-align:center; flex-shrink: 0;}
+    .level{ text-align:center; margin:0 0 6px; color:var(--muted); font-size:13px; flex-shrink: 0;}
+
+    /* Progress phrase */
     #progress{
       display:flex;
       justify-content:center;
-      gap:10px;
+      gap:8px;
       flex-wrap:wrap;
-      margin: 8px 0 6px;
+      margin: 4px 0 8px;
+      flex-shrink: 0;
     }
     .chip{
-      padding: 6px 10px;
+      padding: 4px 8px;
       border-radius: 999px;
       border: 1px solid #2a2a2c;
       background: rgba(255,255,255,0.04);
       color: var(--muted);
       font-weight: 750;
       letter-spacing: .02em;
-      font-size: 12px;
+      font-size: 11px;
       user-select:none;
-      min-width: 98px;
+      min-width: 80px;
       text-align:center;
     }
     .chip.done{
@@ -71,27 +100,47 @@
       background: rgba(181,159,59,.18);
     }
 
-    /* Board */
-    #board{
-      display:grid;
-      gap:10px;
-      justify-content:center;
-      margin: 14px 0 10px;
-    }
-    .row{
-      display:flex;
-      gap:6px;
-      justify-content:center;
-      align-items:center;
-      flex-wrap:nowrap;
+    /* Board Area - Flex grow to fill space */
+    #board-container {
+      flex: 1;
+      display: flex;
+      align-items: center; /* Vertically center board */
+      justify-content: center;
+      min-height: 0; /* Allow shrinking */
+      margin: 10px 0;
     }
 
-    /* Flip tiles */
+    #board{
+      display:grid;
+      gap: 6px;
+      justify-content:center;
+      /* Ensure board doesn't overflow container */
+      max-height: 100%; 
+      width: 100%;
+    }
+
+    .row{
+      display:flex;
+      gap: 5px;
+      justify-content:center;
+      align-items:center;
+    }
+
+    /* Dynamic Tile Sizing */
     .tile{
-      width:38px; height:48px;
+      /* Base size */
+      width: 48px; 
+      height: 48px;
+      
+      /* Responsive sizing: shrink if screen is small */
+      max-width: 13vw;
+      max-height: 8vh; 
+      aspect-ratio: 1 / 1.1; /* Maintain shape */
+      
       perspective: 800px;
       user-select:none;
     }
+
     .tile-inner{
       width:100%; height:100%;
       position:relative;
@@ -108,6 +157,7 @@
       backface-visibility:hidden;
       border:2px solid var(--tileBorder);
       background: transparent;
+      font-size: clamp(1rem, 4vh, 2rem); /* Dynamic font size */
     }
     .tile-front.filled{ border-color: var(--tileBorderFilled); }
 
@@ -127,10 +177,9 @@
       100% { transform: rotateX(180deg); }
     }
 
-    /* Visible word gaps */
     .gap{
-      width:14px;
-      height:48px;
+      width:10px;
+      height:100%;
       display:block;
       opacity:.35;
       position:relative;
@@ -138,41 +187,53 @@
     .gap::after{
       content:"";
       position:absolute;
-      left:2px; right:2px; bottom:12px;
-      height:2px;
+      left:2px; right:2px; bottom:12px; top: 12px;
       background:#4a4a4c;
       border-radius:2px;
     }
 
     /* Keyboard */
-    #keyboard{ margin-top:14px; display:grid; gap:8px; justify-content:center; }
-    .krow{ display:flex; gap:6px; justify-content:center; }
+    #keyboard{ 
+      margin-top: auto; /* Push to bottom */
+      padding-bottom: 5px;
+      display:grid; 
+      gap:6px; 
+      justify-content:center;
+      width: 100%;
+      flex-shrink: 0;
+      transition: opacity 0.2s, height 0.2s;
+    }
+    
+    /* Hide HTML keyboard when Native keyboard is likely up (via JS class) */
+    body.native-active #keyboard {
+      display: none;
+    }
+    
+    .krow{ display:flex; gap:4px; justify-content:center; width: 100%; }
 
     .key{
       border: 1px solid var(--keyBorder);
       background: linear-gradient(180deg, var(--keyTop), var(--keyBot));
       color: var(--keyText);
       font-weight: 850;
-      border-radius: 12px;
-      padding: 12px 10px;
-      min-width: 34px;
+      border-radius: 6px;
+      flex: 1;
+      height: 52px; /* Taller touch targets */
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor:pointer;
       user-select:none;
-      touch-action:manipulation;
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.10),
-        0 8px 18px rgba(0,0,0,0.25);
-      transition: transform 80ms ease, filter 120ms ease, background 120ms ease;
+      font-size: 13px;
     }
-    .key.wide{ min-width: 72px; }
+    .key.wide{ flex: 1.5; font-size: 11px; }
     .key:active{ transform: translateY(1px) scale(0.99); filter: brightness(1.08); }
-    .key:hover{ filter: brightness(1.06); }
 
     .key.absent{ background: var(--absent); border-color: var(--absent); color:#fff; }
     .key.present{ background: var(--present); border-color: var(--present); color:#fff; }
     .key.correct{ background: var(--correct); border-color: var(--correct); color:#fff; }
 
-    .msg{ text-align:center; min-height:22px; margin-top:10px; color:var(--muted); }
+    .msg{ text-align:center; min-height:22px; margin: 4px 0; color:var(--muted); font-size: 14px; flex-shrink: 0;}
 
     /* Win overlay */
     .overlay{
@@ -236,7 +297,6 @@
     #yesBtn{ background:#ff4d8d; color:#111; }
     #yesBtn:hover{ filter: brightness(1.06); }
 
-    /* Start side-by-side and even */
     #noBtn{
       background:#2a2a2c;
       color:#fff;
@@ -287,13 +347,20 @@
 </head>
 
 <body>
-  <div class="wrap">
+  <!-- Hidden Input for Native Keyboard -->
+  <input type="text" id="virtual-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+
+  <div class="wrap" id="gameArea">
     <h1>Wordle - Gojira Edition</h1>
 
     <div id="progress" aria-label="Phrase progress"></div>
     <div class="level" id="levelLabel">Level 1 of 3</div>
 
-    <div id="board" aria-label="Game board"></div>
+    <!-- Container allows board to shrink -->
+    <div id="board-container">
+      <div id="board" aria-label="Game board"></div>
+    </div>
+    
     <div class="msg" id="msg" role="status" aria-live="polite"></div>
 
     <div id="keyboard" aria-label="On-screen keyboard"></div>
@@ -315,7 +382,6 @@
         <div>No attempts: <span id="noCount">0</span></div>
         <div>Yes clicks: <span id="yesCount">0</span></div>
 
-        <!-- Hidden until the button becomes "Yippee" (display:none removes it from layout) -->
         <div id="yippeeCounter" style="display:none;">
           Yippee clicks: <span id="yippeeCount">0</span>
         </div>
@@ -342,6 +408,10 @@
   const keyboardEl = document.getElementById("keyboard");
   const levelLabelEl = document.getElementById("levelLabel");
   const progressEl = document.getElementById("progress");
+  
+  // Mobile keyboard elements
+  const virtualInput = document.getElementById("virtual-input");
+  const gameArea = document.getElementById("gameArea");
 
   const hearts = document.getElementById("hearts");
   const winOverlay = document.getElementById("winOverlay");
@@ -376,12 +446,67 @@
   let noOffsetY = 0;
   let runawayActivated = false;
 
-  const yesPrompts = [
-    "Are you sure?",
-    "If you say yes you'll be stuck with me for a long long time",
-    "I look forward to life with you"
-  ];
   let yesStep = -1;
+
+  // --- Keyboard Management for Mobile ---
+  
+  // Focus the hidden input when clicking anywhere in the game area
+  gameArea.addEventListener('click', (e) => {
+    // Don't focus if clicking a button (like keyboard keys)
+    if (e.target.tagName === 'BUTTON') return;
+    
+    // Slight delay ensures event propagation clears
+    setTimeout(() => {
+        virtualInput.focus({ preventScroll: true });
+    }, 10);
+  });
+
+  virtualInput.addEventListener('focus', () => {
+    document.body.classList.add('native-active');
+  });
+
+  virtualInput.addEventListener('blur', () => {
+    // Delay removing class in case it was just a temporary blur
+    setTimeout(() => {
+        if (document.activeElement !== virtualInput) {
+            document.body.classList.remove('native-active');
+        }
+    }, 100);
+  });
+
+  // Handle native keyboard input
+  virtualInput.addEventListener('input', (e) => {
+    if (locked) return;
+    
+    // Check for Backspace/Delete explicitly from inputType
+    if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward') {
+        handleBackspace();
+        return;
+    }
+    
+    // Handle character input
+    if (e.data) {
+        // e.data can be multiple chars on some Android Keyboards
+        const chars = e.data.split('');
+        for (const char of chars) {
+            handleType(char.toUpperCase());
+        }
+    }
+    
+    // Clear input so we can detect backspace next time
+    virtualInput.value = "";
+  });
+
+  // Handle native "Enter" key
+  virtualInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        handleEnter();
+    }
+  });
+
+
+  // --- Game Logic ---
 
   function normalize(ch){
     if (/[a-z]/i.test(ch)) return ch.toLowerCase();
@@ -590,6 +715,9 @@
           btn.dataset.key = k;
         }
 
+        // Mouse/Touch on HTML keyboard should prevent virtual keyboard from popping up immediately
+        btn.addEventListener("mousedown", (e) => e.preventDefault()); 
+        
         btn.addEventListener("click", () => {
           if (btn.dataset.key === "ENTER") handleEnter();
           else if (btn.dataset.key === "BACK") handleBackspace();
@@ -686,6 +814,9 @@
 
     for (let r = 0; r < MAX_TRIES; r++) renderRow(r);
     advanceToNextEditable();
+    
+    // Auto-focus input on level start (optional, but good for flow)
+    // virtualInput.focus();
   }
 
   function fullPhraseSolved(){
@@ -693,20 +824,19 @@
   }
 
   function openWinScreen(){
+    virtualInput.blur(); // Hide keyboard
     winOverlay.classList.add("show");
     winOverlay.setAttribute("aria-hidden","false");
     yesStep = -1;
     animatePrompt("Will you be my girlfriend?");
     resetNoButtonPosition();
 
-    // reset counters and button label when opening
     yesCount = 0;
     yippeeCount = 0;
     yesCountDisplay.textContent = "0";
     yippeeCountDisplay.textContent = "0";
     yesBtn.textContent = "Yes";
 
-    // Hide yippee counter until the end (display:none means it doesn't affect centering)
     yippeeCounterEl.style.display = "none";
   }
 
@@ -721,7 +851,7 @@
     if (locked) return;
 
     if (!currentGuessComplete()){
-      setMessage("Fill all letters (spaces and “?” are already shown).");
+      setMessage("Fill all letters.");
       return;
     }
 
@@ -752,7 +882,7 @@
     col = 0;
 
     if (row >= MAX_TRIES){
-      setMessage(`Out of tries for this level. Answer: "${ANSWER}"`);
+      setMessage(`Out of tries. Answer: "${ANSWER}"`);
       locked = true;
       return;
     }
@@ -787,9 +917,7 @@
     }, 130);
   }
 
-  // YES -> becomes YIPPEE on final dialogue; yippee clicks counted separately
   yesBtn.addEventListener("click", () => {
-    // Once it is Yippee mode, every click triggers an explosion + increments yippee counter
     if (yesStep >= 2){
       yippeeCount++;
       yippeeCountDisplay.textContent = String(yippeeCount);
@@ -812,11 +940,7 @@
     if (yesStep === 2){
       animatePrompt("I look forward to life with you");
       yesBtn.textContent = "Yippee";
-
-      // Show yippee counter only at the end
       yippeeCounterEl.style.display = "";
-
-      // Keep the original big explosion when "Yippee" first appears
       startEmojiBoom(20, 9);
       return;
     }
@@ -868,8 +992,11 @@
     noBtn.style.transform = `translate(-50%, -50%) translate3d(${noOffsetX}px, ${noOffsetY}px, 0)`;
   }
 
+  // Physical keyboard fallback (desktop)
   window.addEventListener("keydown", (e) => {
     if (winOverlay.classList.contains("show")) return;
+    // Don't double-trigger if focusing the virtual input
+    if (document.activeElement === virtualInput) return;
 
     if (e.key === "Enter") return handleEnter();
     if (e.key === "Backspace") return handleBackspace();
@@ -891,8 +1018,6 @@
     yesCountDisplay.textContent = "0";
     yippeeCountDisplay.textContent = "0";
     yesBtn.textContent = "Yes";
-
-    // Hide yippee counter again on reset
     yippeeCounterEl.style.display = "none";
 
     noCount = 0;
