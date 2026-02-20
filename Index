@@ -1,0 +1,1316 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wordle - Gojira Edition</title>
+  <style>
+    :root{
+      --bg:#121213;
+      --panel:#1a1a1b;
+      --text:#fff;
+      --muted:#cfcfcf;
+
+      --absent:#3a3a3c;
+      --present:#b59f3b;
+      --correct:#538d4e;
+
+      --tileBorder:#565758;
+      --tileBorderFilled:#878a8c;
+
+      --keyTop:#3a3b3f;
+      --keyBot:#2b2c30;
+      --keyBorder:#4a4b50;
+      --keyText:#ffffff;
+    }
+
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      overflow-x:hidden;
+    }
+
+    .wrap{ width:min(980px,94vw); padding:18px 0 26px; }
+    h1{ margin:6px 0 10px; font-size:18px; letter-spacing:.08em; text-align:center; }
+    .level{ text-align:center; margin:0 0 6px; color:var(--muted); font-size:13px; }
+
+    /* Progress phrase (BLANKS until solved) */
+    #progress{
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin: 8px 0 6px;
+    }
+    .chip{
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #2a2a2c;
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-weight: 750;
+      letter-spacing: .02em;
+      font-size: 12px;
+      user-select:none;
+      min-width: 98px;
+      text-align:center;
+    }
+    .chip.done{
+      color:#fff;
+      border-color: rgba(83,141,78,.55);
+      background: rgba(83,141,78,.22);
+    }
+    .chip.active{
+      color:#fff;
+      border-color: rgba(181,159,59,.55);
+      background: rgba(181,159,59,.18);
+    }
+
+    /* Board */
+    #board{
+      display:grid;
+      gap:10px;
+      justify-content:center;
+      margin: 14px 0 10px;
+    }
+    .row{
+      display:flex;
+      gap:6px;
+      justify-content:center;
+      align-items:center;
+      flex-wrap:nowrap;
+    }
+
+    /* Flip tiles */
+    .tile{
+      width:38px; height:48px;
+      perspective: 800px;
+      user-select:none;
+    }
+    .tile-inner{
+      width:100%; height:100%;
+      position:relative;
+      transform-style:preserve-3d;
+    }
+    .tile-face{
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      font-weight:800;
+      text-transform:uppercase;
+      box-sizing:border-box;
+      backface-visibility:hidden;
+      border:2px solid var(--tileBorder);
+      background: transparent;
+    }
+    .tile-front.filled{ border-color: var(--tileBorderFilled); }
+
+    .tile-back{
+      transform: rotateX(180deg);
+      border-color: transparent;
+    }
+    .tile-back.absent{ background:var(--absent); border-color:var(--absent); }
+    .tile-back.present{ background:var(--present); border-color:var(--present); }
+    .tile-back.correct{ background:var(--correct); border-color:var(--correct); }
+
+    .tile.flip .tile-inner{ animation: flip 520ms ease forwards; }
+    @keyframes flip{
+      0%   { transform: rotateX(0deg); }
+      45%  { transform: rotateX(90deg); }
+      55%  { transform: rotateX(90deg); }
+      100% { transform: rotateX(180deg); }
+    }
+
+    /* Visible word gaps */
+    .gap{
+      width:14px;
+      height:48px;
+      display:block;
+      opacity:.35;
+      position:relative;
+    }
+    .gap::after{
+      content:"";
+      position:absolute;
+      left:2px; right:2px; bottom:12px;
+      height:2px;
+      background:#4a4a4c;
+      border-radius:2px;
+    }
+
+    /* Keyboard */
+    #keyboard{ margin-top:14px; display:grid; gap:8px; justify-content:center; }
+    .krow{ display:flex; gap:6px; justify-content:center; }
+
+    .key{
+      border: 1px solid var(--keyBorder);
+      background: linear-gradient(180deg, var(--keyTop), var(--keyBot));
+      color: var(--keyText);
+      font-weight: 850;
+      border-radius: 12px;
+      padding: 12px 10px;
+      min-width: 34px;
+      cursor:pointer;
+      user-select:none;
+      touch-action:manipulation;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        0 8px 18px rgba(0,0,0,0.25);
+      transition: transform 80ms ease, filter 120ms ease, background 120ms ease;
+    }
+    .key.wide{ min-width: 72px; }
+    .key:active{ transform: translateY(1px) scale(0.99); filter: brightness(1.08); }
+    .key:hover{ filter: brightness(1.06); }
+
+    .key.absent{ background: var(--absent); border-color: var(--absent); color:#fff; }
+    .key.present{ background: var(--present); border-color: var(--present); color:#fff; }
+    .key.correct{ background: var(--correct); border-color: var(--correct); color:#fff; }
+
+    .msg{ text-align:center; min-height:22px; margin-top:10px; color:var(--muted); }
+
+    /* Win overlay */
+    .overlay{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.72);
+      display:none;
+      place-items:center;
+      z-index: 50;
+      padding: 18px;
+    }
+    .overlay.show{ display:grid; }
+
+    .modal{
+      width:min(560px, 92vw);
+      background: var(--panel);
+      border:1px solid #2a2a2c;
+      border-radius:16px;
+      padding:18px 16px;
+      text-align:center;
+      box-shadow: 0 10px 40px rgba(0,0,0,.35);
+      position:relative;
+      overflow:hidden;
+    }
+    .modal h2{ margin:6px 0 10px; font-size:20px; }
+
+    /* Prompt animations */
+    #winPrompt{
+      margin:8px 0 14px;
+      opacity:.95;
+      will-change: transform, opacity, filter;
+    }
+    .prompt-pop{ animation: popIn 420ms cubic-bezier(.2,.9,.2,1) both; }
+    @keyframes popIn{
+      0%   { transform: translateY(8px) scale(0.98); opacity: 0; filter: blur(2px); }
+      60%  { transform: translateY(-2px) scale(1.01); opacity: 1; filter: blur(0); }
+      100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
+    }
+
+    .buttons{
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      align-items:center;
+      position:relative;
+      margin-top: 6px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      border:0;
+      border-radius:999px;
+      padding: 12px 18px;
+      cursor:pointer;
+      font-weight:900;
+      font-size:15px;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+    .btn:active{ transform: translateY(1px) scale(0.99); }
+
+    #yesBtn{ background:#ff4d8d; color:#111; }
+    #yesBtn:hover{ filter: brightness(1.06); }
+
+    /* No button: starts even, becomes runaway later */
+    #noBtn{
+      background:#2a2a2c;
+      color:#fff;
+      border:1px solid #444;
+      position: static;
+      transform:none;
+      transition: transform 260ms ease;
+      will-change: transform;
+    }
+    #noBtn.runaway{
+      position: fixed;
+      left: 50%;
+      top: 60%;
+      transform: translate(-50%, -50%) translate3d(0,0,0);
+    }
+
+    .counters{
+      margin-top: 10px;
+      display:flex;
+      justify-content:center;
+      gap:16px;
+      opacity:.88;
+      font-size: 13px;
+      flex-wrap:wrap;
+    }
+
+    /* Emoji confetti */
+    #hearts{
+      position: fixed;
+      inset: 0;
+      pointer-events:none;
+      z-index: 60;
+      overflow:hidden;
+    }
+    .heart{
+      position:absolute;
+      font-size: 22px;
+      opacity: 0;
+      animation: floaty 3s ease-in forwards;
+      filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
+    }
+    @keyframes floaty{
+      0%   { transform: translateY(0) rotate(0deg) scale(.9); opacity:0; }
+      10%  { opacity: 1; }
+      100% { transform: translateY(-160px) rotate(18deg) scale(1.12); opacity:0; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>Wordle - Gojira Edition</h1>
+
+    <div id="progress" aria-label="Phrase progress"></div>
+    <div class="level" id="levelLabel">Level 1 of 3</div>
+
+    <div id="board" aria-label="Game board"></div>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+
+    <div id="keyboard" aria-label="On-screen keyboard"></div>
+  </div>
+
+  <div id="hearts" aria-hidden="true"></div>
+
+  <div class="overlay" id="winOverlay" aria-hidden="true">
+    <div class="modal">
+      <h2 id="winTitle">You got it!</h2>
+      <p id="winPrompt">Will you be my girlfriend?</p>
+
+      <div class="buttons">
+        <button class="btn" id="yesBtn">Yes</button>
+        <button class="btn" id="noBtn">No</button>
+      </div>
+
+      <div class="counters">
+        <div>No attempts: <span id="noCount">0</span></div>
+        <div>Yes clicks: <span id="yesCount">0</span></div>
+        <div>Yippee clicks: <span id="yippeeCount">0</span></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const LEVELS = [
+    { answer: "Will you", tries: 6 },
+    { answer: "be my", tries: 5 },
+    { answer: "girlfriend?", tries: 7 }
+  ];
+
+  const KEY_ROWS = [
+    ["Q","W","E","R","T","Y","U","I","O","P"],
+    ["A","S","D","F","G","H","J","K","L"],
+    ["ENTER","Z","X","C","V","B","N","M","⌫"]
+  ];
+
+  const boardEl = document.getElementById("board");
+  const msgEl = document.getElementById("msg");
+  const keyboardEl = document.getElementById("keyboard");
+  const levelLabelEl = document.getElementById("levelLabel");
+  const progressEl = document.getElementById("progress");
+
+  const hearts = document.getElementById("hearts");
+  const winOverlay = document.getElementById("winOverlay");
+  const winPrompt = document.getElementById("winPrompt");
+  const yesBtn = document.getElementById("yesBtn");
+  const noBtn = document.getElementById("noBtn");
+  const noCountDisplay = document.getElementById("noCount");
+  const yesCountDisplay = document.getElementById("yesCount");
+  const yippeeCountDisplay = document.getElementById("yippeeCount");
+
+  let yesCount = 0;
+  let yippeeCount = 0;
+
+  let levelIndex = 0;
+  let row = 0;
+  let col = 0;
+  let locked = false;
+  let noCount = 0;
+
+  const keyStatus = new Map();
+  const solvedText = Array(LEVELS.length).fill("");
+
+  let ANSWER = "";
+  let MAX_TRIES = 6;
+  let answerChars = [];
+  let L = 0;
+  let guesses = [];
+
+  let noOffsetX = 0;
+  let noOffsetY = 0;
+  let runawayActivated = false;
+
+  const yesPrompts = [
+    "Are you sure?",
+    "If you say yes you'll be stuck with me for a long long time",
+    "I look forward to life with you"
+  ];
+  let yesStep = -1;
+
+  function normalize(ch){
+    if (/[a-z]/i.test(ch)) return ch.toLowerCase();
+    return ch;
+  }
+  function isInputChar(ch){
+    return (/[a-z]/i).test(ch);
+  }
+  function isAutoCharAt(i){
+    return answerChars[i] === " " || answerChars[i] === "?";
+  }
+
+  function prefillAutoCharsForRow(r){
+    for (let i = 0; i < L; i++){
+      if (answerChars[i] === " ") guesses[r][i] = " ";
+      if (answerChars[i] === "?") guesses[r][i] = "?";
+    }
+  }
+
+  function advanceToNextEditable(){
+    while (col < L && isAutoCharAt(col)) col++;
+  }
+  function retreatToPrevEditable(){
+    while (col > 0 && isAutoCharAt(col - 1)) col--;
+  }
+  function setMessage(t){ msgEl.textContent = t; }
+
+  function blanksForLevel(i){
+    const n = LEVELS[i].answer.length;
+    const shown = Math.min(10, Math.max(4, Math.round(n * 0.75)));
+    return "▯".repeat(shown);
+  }
+
+  function renderProgress(){
+    progressEl.innerHTML = "";
+    for (let i = 0; i < LEVELS.length; i++){
+      const chip = document.createElement("div");
+      chip.className = "chip";
+      if (i < levelIndex) chip.classList.add("done");
+      if (i === levelIndex) chip.classList.add("active");
+      chip.textContent = solvedText[i] ? solvedText[i] : blanksForLevel(i);
+      progressEl.appendChild(chip);
+    }
+  }
+
+  function buildBoard(){
+    boardEl.innerHTML = "";
+    for (let r = 0; r < MAX_TRIES; r++){
+      const rowEl = document.createElement("div");
+      rowEl```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wordle - Gojira Edition</title>
+  <style>
+    :root{
+      --bg:#121213;
+      --panel:#1a1a1b;
+      --text:#fff;
+      --muted:#cfcfcf;
+
+      --absent:#3a3a3c;
+      --present:#b59f3b;
+      --correct:#538d4e;
+
+      --tileBorder:#565758;
+      --tileBorderFilled:#878a8c;
+
+      --keyTop:#3a3b3f;
+      --keyBot:#2b2c30;
+      --keyBorder:#4a4b50;
+      --keyText:#ffffff;
+    }
+
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      overflow-x:hidden;
+    }
+
+    .wrap{ width:min(980px,94vw); padding:18px 0 26px; }
+    h1{ margin:6px 0 10px; font-size:18px; letter-spacing:.08em; text-align:center; }
+    .level{ text-align:center; margin:0 0 6px; color:var(--muted); font-size:13px; }
+
+    #progress{
+      display:flex;
+      justify-content:center;
+      gap:10px;
+      flex-wrap:wrap;
+      margin: 8px 0 6px;
+    }
+    .chip{
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #2a2a2c;
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-weight: 750;
+      letter-spacing: .02em;
+      font-size: 12px;
+      user-select:none;
+      min-width: 98px;
+      text-align:center;
+    }
+    .chip.done{
+      color:#fff;
+      border-color: rgba(83,141,78,.55);
+      background: rgba(83,141,78,.22);
+    }
+    .chip.active{
+      color:#fff;
+      border-color: rgba(181,159,59,.55);
+      background: rgba(181,159,59,.18);
+    }
+
+    #board{
+      display:grid;
+      gap:10px;
+      justify-content:center;
+      margin: 14px 0 10px;
+    }
+    .row{
+      display:flex;
+      gap:6px;
+      justify-content:center;
+      align-items:center;
+      flex-wrap:nowrap;
+    }
+
+    .tile{
+      width:38px; height:48px;
+      perspective: 800px;
+      user-select:none;
+    }
+    .tile-inner{
+      width:100%; height:100%;
+      position:relative;
+      transform-style:preserve-3d;
+    }
+    .tile-face{
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      font-weight:800;
+      text-transform:uppercase;
+      box-sizing:border-box;
+      backface-visibility:hidden;
+      border:2px solid var(--tileBorder);
+      background: transparent;
+    }
+    .tile-front.filled{ border-color: var(--tileBorderFilled); }
+
+    .tile-back{
+      transform: rotateX(180deg);
+      border-color: transparent;
+    }
+    .tile-back.absent{ background:var(--absent); border-color:var(--absent); }
+    .tile-back.present{ background:var(--present); border-color:var(--present); }
+    .tile-back.correct{ background:var(--correct); border-color:var(--correct); }
+
+    .tile.flip .tile-inner{ animation: flip 520ms ease forwards; }
+    @keyframes flip{
+      0%   { transform: rotateX(0deg); }
+      45%  { transform: rotateX(90deg); }
+      55%  { transform: rotateX(90deg); }
+      100% { transform: rotateX(180deg); }
+    }
+
+    .gap{
+      width:14px;
+      height:48px;
+      display:block;
+      opacity:.35;
+      position:relative;
+    }
+    .gap::after{
+      content:"";
+      position:absolute;
+      left:2px; right:2px; bottom:12px;
+      height:2px;
+      background:#4a4a4c;
+      border-radius:2px;
+    }
+
+    #keyboard{ margin-top:14px; display:grid; gap:8px; justify-content:center; }
+    .krow{ display:flex; gap:6px; justify-content:center; }
+
+    .key{
+      border: 1px solid var(--keyBorder);
+      background: linear-gradient(180deg, var(--keyTop), var(--keyBot));
+      color: var(--keyText);
+      font-weight: 850;
+      border-radius: 12px;
+      padding: 12px 10px;
+      min-width: 34px;
+      cursor:pointer;
+      user-select:none;
+      touch-action:manipulation;
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        0 8px 18px rgba(0,0,0,0.25);
+      transition: transform 80ms ease, filter 120ms ease, background 120ms ease;
+    }
+    .key.wide{ min-width: 72px; }
+    .key:active{ transform: translateY(1px) scale(0.99); filter: brightness(1.08); }
+    .key:hover{ filter: brightness(1.06); }
+
+    .key.absent{ background: var(--absent); border-color: var(--absent); color:#fff; }
+    .key.present{ background: var(--present); border-color: var(--present); color:#fff; }
+    .key.correct{ background: var(--correct); border-color: var(--correct); color:#fff; }
+
+    .msg{ text-align:center; min-height:22px; margin-top:10px; color:var(--muted); }
+
+    .overlay{
+      position:fixed;
+      inset:0;
+      background: rgba(0,0,0,.72);
+      display:none;
+      place-items:center;
+      z-index: 50;
+      padding: 18px;
+    }
+    .overlay.show{ display:grid; }
+
+    .modal{
+      width:min(560px, 92vw);
+      background: var(--panel);
+      border:1px solid #2a2a2c;
+      border-radius:16px;
+      padding:18px 16px;
+      text-align:center;
+      box-shadow: 0 10px 40px rgba(0,0,0,.35);
+      position:relative;
+      overflow:hidden;
+    }
+    .modal h2{ margin:6px 0 10px; font-size:20px; }
+
+    #winPrompt{
+      margin:8px 0 14px;
+      opacity:.95;
+      will-change: transform, opacity, filter;
+    }
+    .prompt-pop{ animation: popIn 420ms cubic-bezier(.2,.9,.2,1) both; }
+    @keyframes popIn{
+      0%   { transform: translateY(8px) scale(0.98); opacity: 0; filter: blur(2px); }
+      60%  { transform: translateY(-2px) scale(1.01); opacity: 1; filter: blur(0); }
+      100% { transform: translateY(0) scale(1); opacity: 1; filter: blur(0); }
+    }
+
+    .buttons{
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      align-items:center;
+      position:relative;
+      margin-top: 6px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      border:0;
+      border-radius:999px;
+      padding: 12px 18px;
+      cursor:pointer;
+      font-weight:900;
+      font-size:15px;
+      transition: transform 120ms ease, filter 120ms ease;
+    }
+    .btn:active{ transform: translateY(1px) scale(0.99); }
+
+    #yesBtn{ background:#ff4d8d; color:#111; }
+    #yesBtn:hover{ filter: brightness(1.06); }
+
+    #noBtn{
+      background:#2a2a2c;
+      color:#fff;
+      border:1px solid #444;
+      position: static;
+      transform:none;
+      transition: transform 260ms ease;
+      will-change: transform;
+    }
+    #noBtn.runaway{
+      position: fixed;
+      left: 50%;
+      top: 60%;
+      transform: translate(-50%, -50%) translate3d(0,0,0);
+    }
+
+    .counters{
+      margin-top: 10px;
+      display:flex;
+      justify-content:center;
+      gap:16px;
+      opacity:.88;
+      font-size: 13px;
+      flex-wrap:wrap;
+    }
+
+    #hearts{
+      position: fixed;
+      inset: 0;
+      pointer-events:none;
+      z-index: 60;
+      overflow:hidden;
+    }
+    .heart{
+      position:absolute;
+      font-size: 22px;
+      opacity: 0;
+      animation: floaty 3s ease-in forwards;
+      filter: drop-shadow(0 6px 10px rgba(0,0,0,.25));
+    }
+    @keyframes floaty{
+      0%   { transform: translateY(0) rotate(0deg) scale(.9); opacity:0; }
+      10%  { opacity: 1; }
+      100% { transform: translateY(-160px) rotate(18deg) scale(1.12); opacity:0; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>Wordle - Gojira Edition</h1>
+
+    <div id="progress" aria-label="Phrase progress"></div>
+    <div class="level" id="levelLabel">Level 1 of 3</div>
+
+    <div id="board" aria-label="Game board"></div>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+
+    <div id="keyboard" aria-label="On-screen keyboard"></div>
+  </div>
+
+  <div id="hearts" aria-hidden="true"></div>
+
+  <div class="overlay" id="winOverlay" aria-hidden="true">
+    <div class="modal">
+      <h2 id="winTitle">You got it!</h2>
+      <p id="winPrompt">Will you be my girlfriend?</p>
+
+      <div class="buttons">
+        <button class="btn" id="yesBtn">Yes</button>
+        <button class="btn" id="noBtn">No</button>
+      </div>
+
+      <div class="counters">
+        <div>No attempts: <span id="noCount">0</span></div>
+        <div>Yes clicks: <span id="yesCount">0</span></div>
+        <div>Yippee clicks: <span id="yippeeCount">0</span></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const LEVELS = [
+    { answer: "Will you", tries: 6 },
+    { answer: "be my", tries: 5 },
+    { answer: "girlfriend?", tries: 7 }
+  ];
+
+  const KEY_ROWS = [
+    ["Q","W","E","R","T","Y","U","I","O","P"],
+    ["A","S","D","F","G","H","J","K","L"],
+    ["ENTER","Z","X","C","V","B","N","M","⌫"]
+  ];
+
+  const boardEl = document.getElementById("board");
+  const msgEl = document.getElementById("msg");
+  const keyboardEl = document.getElementById("keyboard");
+  const levelLabelEl = document.getElementById("levelLabel");
+  const progressEl = document.getElementById("progress");
+
+  const hearts = document.getElementById("hearts");
+  const winOverlay = document.getElementById("winOverlay");
+  const winPrompt = document.getElementById("winPrompt");
+  const yesBtn = document.getElementById("yesBtn");
+  const noBtn = document.getElementById("noBtn");
+  const noCountDisplay = document.getElementById("noCount");
+  const yesCountDisplay = document.getElementById("yesCount");
+  const yippeeCountDisplay = document.getElementById("yippeeCount");
+
+  let yesCount = 0;
+  let yippeeCount = 0;
+
+  let levelIndex = 0;
+  let row = 0;
+  let col = 0;
+  let locked = false;
+  let noCount = 0;
+
+  const keyStatus = new Map();
+  const solvedText = Array(LEVELS.length).fill("");
+
+  let ANSWER = "";
+  let MAX_TRIES = 6;
+  let answerChars = [];
+  let L = 0;
+  let guesses = [];
+
+  let noOffsetX = 0;
+  let noOffsetY = 0;
+  let runawayActivated = false;
+
+  const yesPrompts = [
+    "Are you sure?",
+    "If you say yes you'll be stuck with me for a long long time",
+    "I look forward to life with you"
+  ];
+  let yesStep = -1;
+
+  function normalize(ch){
+    if (/[a-z]/i.test(ch)) return ch.toLowerCase();
+    return ch;
+  }
+  function isInputChar(ch){
+    return (/[a-z]/i).test(ch);
+  }
+  function isAutoCharAt(i){
+    return answerChars[i] === " " || answerChars[i] === "?";
+  }
+
+  function prefillAutoCharsForRow(r){
+    for (let i = 0; i < L; i++){
+      if (answerChars[i] === " ") guesses[r][i] = " ";
+      if (answerChars[i] === "?") guesses[r][i] = "?";
+    }
+  }
+
+  function advanceToNextEditable(){
+    while (col < L && isAutoCharAt(col)) col++;
+  }
+  function retreatToPrevEditable(){
+    while (col > 0 && isAutoCharAt(col - 1)) col--;
+  }
+  function setMessage(t){ msgEl.textContent = t; }
+
+  function blanksForLevel(i){
+    const n = LEVELS[i].answer.length;
+    const shown = Math.min(10, Math.max(4, Math.round(n * 0.75)));
+    return "▯".repeat(shown);
+  }
+
+  function renderProgress(){
+    progressEl.innerHTML = "";
+    for (let i = 0; i < LEVELS.length; i++){
+      const chip = document.createElement("div");
+      chip.className = "chip";
+      if (i < levelIndex) chip.classList.add("done");
+      if (i === levelIndex) chip.classList.add("active");
+      chip.textContent = solvedText[i] ? solvedText[i] : blanksForLevel(i);
+      progressEl.appendChild(chip);
+    }
+  }
+
+  function buildBoard(){
+    boardEl.innerHTML = "";
+    for (let r = 0; r < MAX_TRIES; r++){
+      const rowEl = document.createElement("div");
+      rowEl.className = "row";
+
+      for (let c = 0; c < L; c++){
+        if (answerChars[c] === " "){
+          const gap = document.createElement("span");
+          gap.className = "gap";
+          rowEl.appendChild(gap);
+          continue;
+        }
+
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.id = `t-${r}-${c}`;
+
+        const inner = document.createElement("div");
+        inner.className = "tile-inner";
+
+        const front = document.createElement("div");
+        front.className = "tile-face tile-front";
+        front.id = `f-${r}-${c}`;
+
+        const back = document.createElement("div");
+        back.className = "tile-face tile-back";
+        back.id = `b-${r}-${c}`;
+
+        if (answerChars[c] === "?"){
+          front.textContent = "?";
+          front.classList.add("filled");
+          back.textContent = "?";
+        }
+
+        inner.appendChild(front);
+        inner.appendChild(back);
+        tile.appendChild(inner);
+        rowEl.appendChild(tile);
+      }
+
+      boardEl.appendChild(rowEl);
+    }
+  }
+
+  function renderRow(r){
+    for (let c = 0; c < L; c++){
+      if (answerChars[c] === " ") continue;
+
+      const front = document.getElementById(`f-${r}-${c}`);
+      const back = document.getElementById(`b-${r}-${c}`);
+
+      if (answerChars[c] === "?"){
+        front.textContent = "?";
+        front.classList.add("filled");
+        back.textContent = "?";
+        continue;
+      }
+
+      const v = guesses[r][c];
+      front.textContent = v === " " ? "" : v;
+      front.classList.toggle("filled", v !== "" && v !== " ");
+      back.textContent = front.textContent;
+    }
+  }
+
+  function clearBackClasses(r){
+    for (let c = 0; c < L; c++){
+      if (answerChars[c] === " ") continue;
+      const back = document.getElementById(`b-${r}-${c}`);
+      back.classList.remove("absent","present","correct");
+    }
+  }
+
+  function evaluateGuess(guessArr){
+    const a = answerChars.map(normalize);
+    const g = guessArr.map(normalize);
+    const res = Array(L).fill("absent");
+    const remaining = new Map();
+
+    for (let i = 0; i < L; i++){
+      if (a[i] === " ") { res[i] = "space"; continue; }
+      if (g[i] !== "" && g[i] === a[i]){
+        res[i] = "correct";
+      } else {
+        const ch = a[i];
+        remaining.set(ch, (remaining.get(ch) || 0) + 1);
+      }
+    }
+
+    for (let i = 0; i < L; i++){
+      if (a[i] === " " || res[i] === "correct") continue;
+      const ch = g[i];
+      if (ch === "") continue;
+
+      const count = remaining.get(ch) || 0;
+      if (count > 0){
+        res[i] = "present";
+        remaining.set(ch, count - 1);
+      }
+    }
+    return res;
+  }
+
+  function statusRank(s){
+    if (s === "correct") return 3;
+    if (s === "present") return 2;
+    if (s === "absent") return 1;
+    return 0;
+  }
+
+  function updateKeyboardFromEval(guessArr, evals){
+    for (let i = 0; i < L; i++){
+      if (answerChars[i] === " ") continue;
+      const raw = guessArr[i];
+      if (!raw) continue;
+
+      const letter = raw.toUpperCase();
+      if (!/[A-Z]/.test(letter)) continue;
+
+      const newStatus = evals[i];
+      if (!["absent","present","correct"].includes(newStatus)) continue;
+
+      const oldStatus = keyStatus.get(letter);
+      if (!oldStatus || statusRank(newStatus) > statusRank(oldStatus)){
+        keyStatus.set(letter, newStatus);
+      }
+    }
+
+    for (const btn of keyboardEl.querySelectorAll("button.key")){
+      const k = btn.dataset.key;
+      if (!k || k === "ENTER" || k === "BACK") continue;
+
+      btn.classList.remove("absent","present","correct");
+      const s = keyStatus.get(k);
+      if (s) btn.classList.add(s);
+    }
+  }
+
+  function buildKeyboard(){
+    keyboardEl.innerHTML = "";
+    for (const row of KEY_ROWS){
+      const rowEl = document.createElement("div");
+      rowEl.className = "krow";
+
+      for (const k of row){
+        const btn = document.createElement("button");
+        btn.className = "key";
+        btn.type = "button";
+
+        if (k === "ENTER"){
+          btn.classList.add("wide");
+          btn.textContent = "Enter";
+          btn.dataset.key = "ENTER";
+        } else if (k === "⌫"){
+          btn.classList.add("wide");
+          btn.textContent = "Back";
+          btn.dataset.key = "BACK";
+        } else {
+          btn.textContent = k;
+          btn.dataset.key = k;
+        }
+
+        btn.addEventListener("click", () => {
+          if (btn.dataset.key === "ENTER") handleEnter();
+          else if (btn.dataset.key === "BACK") handleBackspace();
+          else handleType(btn.dataset.key);
+        });
+
+        rowEl.appendChild(btn);
+      }
+
+      keyboardEl.appendChild(rowEl);
+    }
+  }
+
+  function currentGuessComplete(){
+    for (let i = 0; i < L; i++){
+      if (isAutoCharAt(i)) continue;
+      if (guesses[row][i] === "") return false;
+    }
+    return true;
+  }
+
+  function handleType(k){
+    if (locked) return;
+    const ch = (k.length === 1) ? k : "";
+    if (!ch || !isInputChar(ch)) return;
+
+    advanceToNextEditable();
+    if (col >= L) return;
+
+    guesses[row][col] = ch;
+    col++;
+    advanceToNextEditable();
+    renderRow(row);
+  }
+
+  function handleBackspace(){
+    if (locked) return;
+    retreatToPrevEditable();
+    if (col <= 0) return;
+
+    col--;
+    retreatToPrevEditable();
+    guesses[row][col] = "";
+    renderRow(row);
+  }
+
+  function wait(ms){ return new Promise(res => setTimeout(res, ms)); }
+
+  async function revealRowWithFlip(r, evals){
+    for (let c = 0; c < L; c++){
+      if (answerChars[c] === " ") continue;
+
+      const tile = document.getElementById(`t-${r}-${c}`);
+      const back = document.getElementById(`b-${r}-${c}`);
+      const front = document.getElementById(`f-${r}-${c}`);
+
+      const status = evals[c];
+      if (status === "space") continue;
+
+      back.classList.remove("absent","present","correct");
+      back.classList.add(status);
+      back.textContent = front.textContent;
+
+      await wait(140);
+      tile.classList.remove("flip");
+      void tile.offsetWidth;
+      tile.classList.add("flip");
+    }
+    await wait(420);
+  }
+
+  function startLevel(i){
+    levelIndex = i;
+    const lvl = LEVELS[levelIndex];
+    ANSWER = lvl.answer;
+    MAX_TRIES = lvl.tries;
+
+    answerChars = Array.from(ANSWER);
+    L = answerChars.length;
+
+    row = 0;
+    col = 0;
+    locked = false;
+
+    guesses = Array.from({ length: MAX_TRIES }, () => Array(L).fill(""));
+    for (let r = 0; r < MAX_TRIES; r++) prefillAutoCharsForRow(r);
+
+    levelLabelEl.textContent = `Level ${levelIndex + 1} of ${LEVELS.length}`;
+    setMessage("");
+
+    renderProgress();
+    buildBoard();
+    buildKeyboard();
+
+    for (let r = 0; r < MAX_TRIES; r++) renderRow(r);
+    advanceToNextEditable();
+  }
+
+  function fullPhraseSolved(){
+    return levelIndex === LEVELS.length - 1;
+  }
+
+  function openWinScreen(){
+    winOverlay.classList.add("show");
+    winOverlay.setAttribute("aria-hidden","false");
+    yesStep = -1;
+    animatePrompt("Will you be my girlfriend?");
+    resetNoButtonPosition();
+
+    // reset counters when opening
+    yesCount = 0;
+    yippeeCount = 0;
+    yesCountDisplay.textContent = "0";
+    yippeeCountDisplay.textContent = "0";
+    yesBtn.textContent = "Yes";
+  }
+
+  function animatePrompt(text){
+    winPrompt.classList.remove("prompt-pop");
+    void winPrompt.offsetWidth;
+    winPrompt.textContent = text;
+    winPrompt.classList.add("prompt-pop");
+  }
+
+  async function handleEnter(){
+    if (locked) return;
+
+    if (!currentGuessComplete()){
+      setMessage("Fill all letters (spaces and “?” are already shown).");
+      return;
+    }
+
+    locked = true;
+    clearBackClasses(row);
+
+    const evals = evaluateGuess(guesses[row]);
+    await revealRowWithFlip(row, evals);
+    updateKeyboardFromEval(guesses[row], evals);
+
+    const guessStr = guesses[row].join("");
+    if (normalize(guessStr) === normalize(ANSWER)){
+      solvedText[levelIndex] = ANSWER;
+      renderProgress();
+
+      if (fullPhraseSolved()){
+        openWinScreen();
+        return;
+      }
+
+      setMessage("Nice! Next level…");
+      await wait(650);
+      startLevel(levelIndex + 1);
+      return;
+    }
+
+    row++;
+    col = 0;
+
+    if (row >= MAX_TRIES){
+      setMessage(`Out of tries for this level. Answer: "${ANSWER}"`);
+      locked = true;
+      return;
+    }
+
+    prefillAutoCharsForRow(row);
+    advanceToNextEditable();
+    renderRow(row);
+    setMessage("");
+    locked = false;
+  }
+
+  function createEmoji(emoji){
+    const el = document.createElement('div');
+    el.className = 'heart';
+    el.textContent = emoji;
+    el.style.left = Math.random() * 100 + '%';
+    el.style.top = (55 + Math.random() * 40) + '%';
+    el.style.animationDelay = (Math.random() * 0.2) + 's';
+    hearts.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  function startEmojiBoom(waves = 10, perWave = 6){
+    const emojis = ["🍀","🌸","✨","💥","🎉","💖"];
+    let count = 0;
+    const timer = setInterval(() => {
+      for (let i = 0; i < perWave; i++){
+        createEmoji(emojis[Math.floor(Math.random() * emojis.length)]);
+      }
+      count++;
+      if (count >= waves) clearInterval(timer);
+    }, 130);
+  }
+
+  yesBtn.addEventListener("click", () => {
+    // If we're on the final dialogue already, this button is "Yippee"
+    const finalDialogueShowing = (yesStep >= 2);
+
+    if (finalDialogueShowing){
+      yippeeCount++;
+      yippeeCountDisplay.textContent = String(yippeeCount);
+      // optional: keep exploding only once (at the moment we first reach final dialogue)
+      return;
+    }
+
+    yesCount++;
+    yesCountDisplay.textContent = String(yesCount);
+
+    yesStep++;
+    if (yesStep === 0){
+      animatePrompt("Are you sure?");
+      return;
+    }
+    if (yesStep === 1){
+      animatePrompt("If you say yes you'll be stuck with me for a long long time");
+      return;
+    }
+    if (yesStep === 2){
+      animatePrompt("I look forward to life with you");
+      yesBtn.textContent = "Yippee";
+      startEmojiBoom(20, 9); // explosion when final dialogue appears
+      return;
+    }
+  });
+
+  function resetNoButtonPosition(){
+    runawayActivated = false;
+    noOffsetX = 0;
+    noOffsetY = 0;
+    noBtn.classList.remove("runaway");
+    noBtn.style.transform = "none";
+  }
+
+  function ensureRunawayMode(){
+    if (runawayActivated) return;
+    runawayActivated = true;
+    noBtn.classList.add("runaway");
+    noBtn.style.transform = 'translate(-50%, -50%) translate3d(0,0,0)';
+  }
+
+  noBtn.addEventListener('mouseenter', () => { ensureRunawayMode(); moveNoSmooth(); });
+  noBtn.addEventListener('touchstart', (e) => { e.preventDefault(); ensureRunawayMode(); moveNoSmooth(); });
+  noBtn.addEventListener('click', () => {
+    noCount++;
+    noCountDisplay.textContent = String(noCount);
+    ensureRunawayMode();
+    moveNoSmooth();
+  });
+
+  function moveNoSmooth(){
+    if (!runawayActivated) return;
+
+    noCount++;
+    noCountDisplay.textContent = String(noCount);
+
+    const padding = 20;
+    const bw = noBtn.offsetWidth;
+    const bh = noBtn.offsetHeight;
+
+    const targetX = padding + Math.random() * Math.max(0, window.innerWidth - bw - padding*2);
+    const targetY = padding + Math.random() * Math.max(0, window.innerHeight - bh - padding*2);
+
+    const anchorX = window.innerWidth * 0.5 - bw * 0.5;
+    const anchorY = window.innerHeight * 0.6 - bh * 0.5;
+
+    noOffsetX = targetX - anchorX;
+    noOffsetY = targetY - anchorY;
+
+    noBtn.style.transform = `translate(-50%, -50%) translate3d(${noOffsetX}px, ${noOffsetY}px, 0)`;
+  }
+
+  window.addEventListener("keydown", (e) => {
+    if (winOverlay.classList.contains("show")) return;
+
+    if (e.key === "Enter") return handleEnter();
+    if (e.key === "Backspace") return handleBackspace();
+
+    const k = e.key;
+    if (!isInputChar(k)) return;
+    handleType(k.toUpperCase());
+  });
+
+  winOverlay.addEventListener("click", (e) => {
+    if (e.target !== winOverlay) return;
+
+    winOverlay.classList.remove("show");
+    winOverlay.setAttribute("aria-hidden","true");
+
+    yesStep = -1;
+    yesCount = 0;
+    yippeeCount = 0;
+    yesCountDisplay.textContent = "0";
+    yippeeCountDisplay.textContent = "0";
+    yesBtn.textContent = "Yes";
+
+    noCount = 0;
+    noCountDisplay.textContent = "0";
+
+    keyStatus.clear();
+    for (let i = 0; i < solvedText.length; i++) solvedText[i] = "";
+
+    resetNoButtonPosition();
+    startLevel(0);
+  });
+
+  renderProgress();
+  startLevel(0);
+})();
+</script>
+</body>
+</html>
