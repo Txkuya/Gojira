@@ -169,11 +169,11 @@ h1{ margin:8px 0 4px; font-size:18px; letter-spacing:.08em; text-align:center; }
 /* Keyboard */
 #keyboard{ 
   margin-top: auto; /* Pushes keyboard to bottom of screen naturally */
-  margin-bottom: 0;
+  margin-bottom: 10px; /* buffer above Chrome's function bar */
   display:grid; 
   gap:6px; 
   width: 100%;
-  padding: 0 6px;
+  padding: 0 6px 10px; /* extra bottom padding = visual + safe area */
   box-sizing: border-box;
 }
 .krow{ 
