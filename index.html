@@ -686,11 +686,16 @@ h1{ margin:8px 0 4px; font-size:18px; letter-spacing:.08em; text-align:center; }
 
   function handleBackspace(){
     if (locked) return;
-    retreatToPrevEditable();
     if (col <= 0) return;
 
+    // Step back one position
     col--;
-    retreatToPrevEditable();
+
+    // Skip over any auto characters (space or '?') to the left
+    while (col > 0 && isAutoCharAt(col)) {
+      col--;
+    }
+
     guesses[row][col] = "";
     renderRow(row);
   }
