@@ -169,7 +169,7 @@ h1{ margin:8px 0 4px; font-size:18px; letter-spacing:.08em; text-align:center; }
 /* Keyboard */
 #keyboard{ 
   margin-top: auto; /* Pushes keyboard to bottom of screen naturally */
-  margin-bottom: 10px; /* buffer above Chrome's function bar */
+  margin-bottom: 20px; /* buffer above Chrome's function bar */
   display:grid; 
   gap:15px; 
   width: 100%;
@@ -740,6 +740,9 @@ h1{ margin:8px 0 4px; font-size:18px; letter-spacing:.08em; text-align:center; }
 
     renderProgress();
     buildBoard();
+
+    // Reset keyboard colors and state per level
+    keyStatus.clear();
     buildKeyboard();
 
     for (let r = 0; r < MAX_TRIES; r++) renderRow(r);
